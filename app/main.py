@@ -1,6 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
+from app.api.session import start_session
+from app.config import save_message, get_history
+from app.utils.qdrant_utils import create_qdrant_collection
+# from app.api.rag_pipeline import router as rag_pipeline_router
 
 # Initialize FastAPI app
 app = FastAPI(title="Chatbod news", version="1.0")
@@ -14,8 +17,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+create_qdrant_collection()
 # Include routes
-app.include_router( prefix="/r1", tags=["R1"])
+
+# Include the routes from session.py
+app.add_api_route("/start-session", start_session)
+
+# Include the RAG pipeline routes
+# app.include_router(rag_pipeline_router)
+
+# Include the routes from config.py
+app.add_api_route("/save-message/{session_id}", save_message, methods=["POST"])
+app.add_api_route("/get-history/{session_id}", get_history, methods=["GET"])
 
 
 
