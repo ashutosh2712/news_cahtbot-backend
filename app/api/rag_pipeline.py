@@ -1,5 +1,6 @@
 # rag_pipeline.py
-
+import redis
+import json
 import os
 import requests
 #from bs4 import BeautifulSoup
@@ -14,10 +15,14 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+redis_client = redis.Redis(host="localhost", port=6379, db=0)
+
 # Initialize Qdrant client
 qdrant_client = QdrantClient(host="localhost", port=6333)
 model = SentenceTransformer('all-MiniLM-L6-v2')  # Load the sentence transformer model
 
+
+TTL = 1 * 60 * 60  # 1 hours
 # Qdrant collection name
 collection_name = "news_articles_chatbot"
 
@@ -30,6 +35,12 @@ def get_news_articles(api_key=None):
     if api_key is None:
         # If no API key is passed, load it from the .env file
         api_key = os.getenv("NEWSAPI_API_KEY")
+        
+    # Check if the articles are cached in Redis
+    cached_articles = redis_client.get("cached_articles")
+    if cached_articles:
+        print("Returning cached articles from Redis.")
+        return json.loads(cached_articles)
 
     if api_key:
         url = f"https://newsapi.org/v2/everything?q=AI&apiKey={api_key}"
@@ -47,6 +58,10 @@ def get_news_articles(api_key=None):
             title = article.get("title", "")
             content = article.get("content", "")
             article_data.append({"title": title, "content": content})
+            
+        # Cache the articles in Redis (TTL of 1 hour)
+        redis_client.setex("cached_articles", TTL, json.dumps(articles))  # Cache for 1 hour
+        print("Fetching articles from NewsAPI and caching them.")
         
         return article_data
     else:
@@ -58,6 +73,13 @@ def embed_articles(articles):
     """
     This function embeds the article content using a pre-trained transformer model.
     """
+    
+    # Check if the embeddings are cached in Redis
+    cached_embeddings = redis_client.get("cached_embeddings")
+    if cached_embeddings:
+        print("Returning cached embeddings from Redis.")
+        return json.loads(cached_embeddings)
+    
     embeddings = []
     
     for article in articles:
@@ -73,6 +95,10 @@ def embed_articles(articles):
         
         # Append the first (and only) element of the embedding (it's a list of embeddings)
         embeddings.append(embedding[0].tolist())  # We take the first element since we passed a list
+        
+        # Cache the embeddings in Redis (TTL of 1 hour)
+        redis_client.setex("cached_embeddings", TTL, json.dumps(embeddings))  # Cache for 1 hour
+        print("Embedding articles and caching embeddings.")
         
     return embeddings
 

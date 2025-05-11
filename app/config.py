@@ -9,7 +9,7 @@ redis_client = redis.Redis(host="localhost", port=6379, db=0)
 #redis_client = redis.Redis(host="redis", port=6379, db=0)
 
 # Setting TTL to 24 hours for each session data (in seconds)
-TTL = 24 * 60 * 60  # 24 hours
+TTL = 1 * 60 * 60  # 1 hours
 
 @app.post("/save-message/{session_id}")
 async def save_message(session_id: str, message: Message):
