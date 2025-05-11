@@ -5,7 +5,8 @@ import requests
 #from bs4 import BeautifulSoup
 from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
-from qdrant_client.models import PointStruct,NamedVector
+from qdrant_client.models import PointStruct, NamedVector
+from app.utils.gemini_integration import call_gemini_api
 
 from dotenv import load_dotenv
 
@@ -61,6 +62,7 @@ def embed_articles(articles):
     
     for article in articles:
         content = article.get("content")  # Safely get the content from the article
+        #content = article.content  # Accessing content directly
         
         # Skip articles with empty or missing content
         if not content:
@@ -70,7 +72,7 @@ def embed_articles(articles):
         embedding = model.encode([content])  # The model expects a list of texts
         
         # Append the first (and only) element of the embedding (it's a list of embeddings)
-        embeddings.append(embedding[0])  # We take the first element since we passed a list
+        embeddings.append(embedding[0].tolist())  # We take the first element since we passed a list
         
     return embeddings
 
@@ -87,7 +89,7 @@ def insert_embeddings_into_qdrant(articles, embeddings):
         point = PointStruct(
             id=article_id,
             vector=embeddings[i],  # The embedding vector
-            payload={"title": article["title"], "content": article["content"]}  # Metadata
+            payload={"title": article.title, "content": article.content}  # Metadata
         )
 
         # Upsert the point into Qdrant
@@ -107,32 +109,25 @@ def search_relevant_articles(query, limit=3):
     query_embedding = model.encode([query])
 
     # Step 2: Create NamedVector (field name is "vector" in Qdrant by default)
-    # named_vector = NamedVector(
-    #         name="vector",  # Use the default vector field name 'vector'
-    #         vector=query_embedding[0]  # Use the embedding vector (first element since it's a list of lists)
-    #     )
-
-    # Step 3: Perform search in Qdrant
-    # search_results = qdrant_client.search(
-    #     collection_name=collection_name,
-    #     query_vector=named_vector,
-    #     limit=limit  # Retrieve top 3 most similar articles
-    # )
+    
     search_results = qdrant_client.query_points(
         collection_name=collection_name,
         query=query_embedding[0],  # Use the query vector directly (it should be a list of floats)
         limit=limit  # Retrieve top-k most similar articles
     )
-    #print("Search Results:", search_results)
-    # search_results = qdrant_client.query(
-    #     collection_name=collection_name,
-    #     query_text=query_embedding[0]
-    # )
-
-    # Step 4: Extract the relevant passages (article content)
-    passages = [result.payload for result in search_results.points]
+    #print(f"Search results: {search_results}")
     
-    return passages
+    # Step 3: Extract the relevant passages (article content) and convert to text
+    passages = [
+        f"Title: {result.payload['title']}\nContent: {result.payload['content']}" 
+        for result in search_results.points
+    ]
+    print(f"Passages: {passages}")
+    
+    # Now, call the Gemini API to generate the final answer
+    final_answer = call_gemini_api(passages, query)
+    
+    return final_answer
 
 # 5. Full RAG Pipeline to Ingest and Query Articles
 def run_rag_pipeline(api_key=None, query=None):

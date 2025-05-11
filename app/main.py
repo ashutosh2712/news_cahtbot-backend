@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.session import start_session
 from app.config import save_message, get_history
 from app.utils.qdrant_utils import create_qdrant_collection
+from app.api.articles_api import router as articles_router
 # from app.api.rag_pipeline import router as rag_pipeline_router
 
 # Initialize FastAPI app
@@ -25,6 +26,9 @@ app.add_api_route("/start-session", start_session)
 
 # Include the RAG pipeline routes
 # app.include_router(rag_pipeline_router)
+
+# Include the articles API router
+app.include_router(articles_router)
 
 # Include the routes from config.py
 app.add_api_route("/save-message/{session_id}", save_message, methods=["POST"])
