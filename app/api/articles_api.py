@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from app.models import Article, ArticlesRequest
 from typing import List
+from app.utils.gemini_integration import call_gemini_api
 
 from app.api.rag_pipeline import (
     get_news_articles, 
@@ -68,6 +69,21 @@ async def search_relevant_articles_endpoint(query: str, limit: int = 3):
     """
     try:
         search_results = search_relevant_articles(query, limit)
-        return {"search_results": search_results}
+        
+          # Step 3: Extract the relevant passages (article content) and convert to text
+        passages = [
+            f"Title: {result.payload['title']}\nContent: {result.payload['content']}" 
+            for result in search_results.points
+        ]
+        
+        #print(f"Passages: {passages}")
+        
+        # Now, call the Gemini API to generate the final answer
+        final_answer = call_gemini_api(passages, query)
+        
+        return {
+            "search_results": passages,
+            "final_answer": final_answer
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error performing search: {str(e)}")

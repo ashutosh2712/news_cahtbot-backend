@@ -6,7 +6,7 @@ import requests
 from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
 from qdrant_client.models import PointStruct, NamedVector
-from app.utils.gemini_integration import call_gemini_api
+
 
 from dotenv import load_dotenv
 
@@ -117,17 +117,8 @@ def search_relevant_articles(query, limit=3):
     )
     #print(f"Search results: {search_results}")
     
-    # Step 3: Extract the relevant passages (article content) and convert to text
-    passages = [
-        f"Title: {result.payload['title']}\nContent: {result.payload['content']}" 
-        for result in search_results.points
-    ]
-    print(f"Passages: {passages}")
     
-    # Now, call the Gemini API to generate the final answer
-    final_answer = call_gemini_api(passages, query)
-    
-    return final_answer
+    return search_results
 
 # 5. Full RAG Pipeline to Ingest and Query Articles
 def run_rag_pipeline(api_key=None, query=None):
